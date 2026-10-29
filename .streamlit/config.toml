@@ -1,0 +1,27 @@
+[client]
+# App-like menu: keep the viewer options (theme, print), hide Streamlit's
+# developer options such as the Deploy button.
+toolbarMode = "viewer"
+
+# The app's look: a teal accent on calm surfaces, in light and dark, following
+# the viewer's system setting. views/common.py (UI) uses the same colors.
+[theme]
+font = "Figtree:https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap"
+baseRadius = "large"
+headingFontWeights = [700, 650, 650, 600, 600, 600]
+
+[theme.light]
+font = "Figtree:https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap"
+primaryColor = "#0b7d74"
+backgroundColor = "#f3f6f5"
+secondaryBackgroundColor = "#e7eeec"
+textColor = "#13201d"
+borderColor = "#d6dfdc"
+
+[theme.dark]
+font = "Figtree:https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap"
+primaryColor = "#74d9cd"
+backgroundColor = "#0e1514"
+secondaryBackgroundColor = "#1d2827"
+textColor = "#e7efed"
+borderColor = "#26332f"

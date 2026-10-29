@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# Local data: your orders database and Gmail refresh token
+data/
+
+# Google OAuth client secret
+.streamlit/secrets.toml

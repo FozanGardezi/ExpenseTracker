@@ -1,0 +1,3 @@
+# For running the tests: pip install -r requirements-dev.txt
+-r requirements.txt
+fpdf2>=2.8  # builds the statement PDFs the tests read
