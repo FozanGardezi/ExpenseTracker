@@ -25,12 +25,13 @@ from order_tracker import auth
 from order_tracker.config import (
     DEFAULT_REDIRECT_URI, GoogleConfig, load_google_config, save_google_config,
 )
+from order_tracker.consent import consent_markdown
 from order_tracker.parsers import PROVIDERS
 from order_tracker.sync import available_sources
 from order_tracker.users import User, save_profile, user_id_for
 from views import dialogs
 from views.common import (
-    app_style, consent_markdown, current_user, flash, gmail_session, gmail_tokens, open_sessions, open_store,
+    app_style, current_user, flash, gmail_session, gmail_tokens, open_sessions, open_store,
     run_sync, session_cookie, set_session_cookie,
 )
 from views.components import follow_theme

@@ -24,21 +24,21 @@ def _hash(token: str) -> str:
 
 class SessionStore:
     def __init__(self, path: Path):
-        self.conn = sqlite3.connect(path)
+        self.conn = sqlite3.connect(path, check_same_thread=False)  # see OrderStore
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, "
             "email TEXT NOT NULL, name TEXT NOT NULL, expires TEXT NOT NULL)"
         )
         self.conn.commit()
 
-    def create(self, user: User) -> str:
+    def create(self, user: User, days: int = SESSION_DAYS) -> str:
         now = dt.datetime.now(dt.UTC)
         token = secrets.token_urlsafe(32)
         self.conn.execute("DELETE FROM sessions WHERE expires < ?", (now.isoformat(),))
         self.conn.execute(
             "INSERT INTO sessions VALUES (?, ?, ?, ?, ?)",
             (_hash(token), user.id, user.email, user.name,
-             (now + dt.timedelta(days=SESSION_DAYS)).isoformat()),
+             (now + dt.timedelta(days=days)).isoformat()),
         )
         self.conn.commit()
         return token

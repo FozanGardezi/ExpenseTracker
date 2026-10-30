@@ -152,7 +152,9 @@ _ADDED_COLUMNS = {
 
 class OrderStore:
     def __init__(self, path: Path):
-        self.conn = sqlite3.connect(path)
+        # The API server may open a request's store on one worker thread and use it on
+        # another; each connection is still used by one request (or sync job) at a time.
+        self.conn = sqlite3.connect(path, check_same_thread=False)
         self.conn.executescript(_SCHEMA)
         self._upgrade()
 
