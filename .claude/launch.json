@@ -2,6 +2,18 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "api",
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": ["-m", "api"],
+      "port": 8000
+    },
+    {
+      "name": "mobile-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "mobile", "run", "web", "--", "--port", "8081"],
+      "port": 8081
+    },
+    {
       "name": "app",
       "runtimeExecutable": ".venv/bin/streamlit",
       "runtimeArgs": ["run", "app.py", "--server.port", "8501", "--server.headless", "true"],
