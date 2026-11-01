@@ -74,30 +74,6 @@ def current_user() -> User | None:
     return st.session_state.get("user")
 
 
-def consent_markdown(sender_names: list[str]) -> str:
-    """What the app does with Gmail access, shown before the user allows it."""
-    return f"""
-**What the app will do**
-- Search your Gmail for emails from these senders only: {', '.join(sender_names)}.
-- Read those emails to pull out the date, amount, merchant or payee, and order or reference number.
-- Keep what it finds in your own private space in this app, which other users can't see.
-
-**What it will never do**
-- Send, delete, change or label any of your emails.
-- Look at emails from other senders. Google's read-only permission covers your whole
-  mailbox, because Gmail has no permission for "only these senders", so this is a promise
-  the app keeps by only ever searching for the senders above.
-- Share your data with anyone, or use it for advertising.
-
-**You stay in control**
-- Disconnect Gmail at any time under **Settings → Gmail & account**. That also withdraws
-  the permission at Google.
-- Delete all your data at any time in the same place.
-- You can also see and remove the app's access in your Google account under
-  *Security → Third-party apps*.
-"""
-
-
 def open_store(user: User | None = None) -> OrderStore:
     """The signed-in user's own database."""
     user = user or current_user()

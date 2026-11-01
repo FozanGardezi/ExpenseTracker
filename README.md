@@ -33,13 +33,47 @@ None of these services offers a public API for this data, so emails are the
 source. The order parsing started from
 [FoodpandaExpenseTracker](https://github.com/fasi96/FoodpandaExpenseTracker).
 
+## The phone app
+
+Expense Tracker is a **native app for iPhone and Android**, built with
+[Expo](https://expo.dev) (React Native), in `mobile/`. The same code also runs
+in a browser. The app talks to a small **API server** (`api/`, FastAPI), which
+does the work it always did, with the same Python code (`order_tracker/`):
+Continue with Google, reading Gmail and statement PDFs, matching payments to
+orders, budgets and what stands out. The original **Streamlit website**
+(`app.py`) still works on that same code and data, so you can use either.
+
+```
+phone app (mobile/) ──HTTPS──▶ API (api/) ──┐
+                                            ├──▶ order_tracker/ ──▶ Gmail, data/users/<id>/
+website (app.py) ───────────────────────────┘
+```
+
+Why it's built this way:
+- **Gmail stays on the server.** The read-only Gmail permission and its
+  long-lived token never reach the phone. Syncing runs on the server, where it
+  can take minutes over a year of email, and the cron job keeps working when
+  the app is closed. iOS stops apps from doing that work in the background.
+- **One codebase, both platforms.** The app is TypeScript, and Expo builds and
+  signs the iOS and Android apps in the cloud (no Mac needed), ships updates
+  over the air, and runs the same code in a browser.
+- **Nothing to re-learn.** Every figure comes from the same tested Python as
+  before. Each screen has one endpoint that works out what the screen shows,
+  and the app lays it out.
+
+See [Setup](#setup) to run both, and [Trying it on a phone](#trying-it-on-a-phone).
+
 ## Pages
 
 Four tabs, each with sub-tabs. The introduction and the controls are only on
 Home; the other tabs are just your data and settings. It's laid out like a
 banking app: cards, lists you tap (a payment opens in a sheet), light and dark
-themes that follow your system (or the ⋮ menu). Columns stack on a phone, and
-the tabs fold into a menu.
+themes that follow your system (or **Settings → Appearance** in the app, the ⋮
+menu on the website). In the phone app the four tabs are the tab bar at the
+bottom and the sub-tabs a switch at the top. Where the website edits many rows
+at once in a table (Transactions, Statements, Transfers), the app changes one
+payment at a time in its sheet, and **Export CSV** saves or shares the list. On
+the website, columns stack on a phone and the tabs fold into a menu.
 
 | Tab | Sub-tabs | What's there |
 |---|---|---|
@@ -60,8 +94,9 @@ the tabs fold into a menu.
 | | **Skipped emails** | Emails from tracked senders that weren't counted, and why. |
 | | **Privacy** | What the app collects and why (also public at `/privacy`). |
 
-Each sub-tab has its own address (for example `/activity?activity=Statements`),
-so it can be linked to and bookmarked.
+Each sub-tab has its own address (for example `/activity?activity=Statements`
+on the website, `/activity?tab=statements` in the app), so it can be linked to
+and bookmarked.
 
 ## Continue with Google and the Gmail permission
 
@@ -89,6 +124,15 @@ so it can be linked to and bookmarked.
 6. **Disconnect Gmail** revokes the permission at Google and deletes the token.
    **Delete my data** removes the user's whole directory. **Sign out** deletes the
    remembered sign-in and clears the cookie; it doesn't withdraw Gmail access.
+
+**In the phone app** the steps are the same, with Google's screen in the phone's
+browser (Google doesn't allow it inside an app). The API handles Google's answer
+at `/auth/google/callback`, then sends the browser back to the app
+(`expensetracker://auth`) with a one-time code. The app swaps it for a session
+token, which stays in the phone's Keychain or Keystore (expo-secure-store) for up
+to 180 days; the server keeps only its hash. The swap also needs a secret the
+app made up before opening Google (PKCE), so another app that catches the
+redirect can't use the code. **Sign out** forgets that phone's token only.
 
 Gmail has no permission limited to particular senders, so `gmail.readonly`
 covers the whole mailbox. The app only ever *requests* emails matching the
@@ -268,7 +312,11 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
 
-Python 3.11 or newer.
+Python 3.11 or newer. For the phone app, also Node.js 20 or newer:
+
+```bash
+cd mobile && npm install
+```
 
 ### 2. Register the app with Google (one time, by you)
 
@@ -283,17 +331,20 @@ never do this step; they just click *Continue with Google*.
    - App home page: your app's URL. Privacy policy: `<your app URL>/privacy`.
    - Scopes: `openid`, `.../auth/userinfo.email`, `.../auth/userinfo.profile` and `.../auth/gmail.readonly`.
    - While testing, add every user's Gmail address under *Test users*.
-4. **Credentials → Create credentials → OAuth client ID**: type *Web application*,
-   with authorized redirect URI `http://localhost:8501`. The app's setup page
-   shows the exact address to use.
-5. Start the app (step 3). Its **Set up Google access** page asks for the client
-   ID and secret once and stores them encrypted in `data/google_client.enc`.
-   To change them later, delete that file.
+4. **Credentials → Create credentials → OAuth client ID**: type *Web application*
+   (the phone app uses it too, through the API), with these authorized redirect URIs:
+   - `http://localhost:8000/auth/google/callback` for the API, or
+     `<API_PUBLIC_URL>/auth/google/callback` once it has a public address;
+   - `http://localhost:8501` if you also run the website.
+5. Give the API the client ID and secret as environment variables:
+   `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. (If you've used the website,
+   its **Set up Google access** page has already stored them encrypted in
+   `data/google_client.enc`, and the API reads them from there.)
 
-You don't need `secrets.toml`. Use it, or environment variables
-(`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`), only if you'd
-rather not use the setup page, for example on a hosting platform's secrets
-settings. See `.streamlit/secrets.toml.example`.
+You don't need `secrets.toml`. Use it, or the environment variables (and
+`GOOGLE_REDIRECT_URI` for the website), only if you'd rather not use the setup
+page, for example on a hosting platform's secrets settings. See
+`.streamlit/secrets.toml.example`.
 
 ### Letting other people sign in
 
@@ -313,7 +364,9 @@ contact_email` so the Privacy page has a contact, and have the Privacy page
 checked before you submit.
 
 For a deployment:
-- Use an HTTPS redirect URI.
+- Use an HTTPS redirect URI, and set `API_PUBLIC_URL` to the API's public
+  address (`https://api.example.com`); its callback is
+  `<API_PUBLIC_URL>/auth/google/callback`.
 - Set `[gmail] token_key` (or `GMAIL_TOKEN_KEY`) instead of relying on the key
   generated in `data/`.
 - Complete the setup page yourself before sharing the address. Until a client
@@ -321,26 +374,97 @@ For a deployment:
 - Each user's data lives in `data/users/`, so put it on persistent, backed-up
   storage.
 
-### 3. Run
+### 3. Run the API
+
+```bash
+GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=... .venv/bin/python -m api
+```
+
+It listens on port 8000 (`PORT` changes it); `--reload` restarts it when the
+code changes. Its endpoints are listed at http://localhost:8000/api/docs, and the
+privacy notice Google's review asks for is at http://localhost:8000/privacy.
+
+### 4. Run the app
+
+```bash
+cd mobile
+cp .env.example .env.local   # EXPO_PUBLIC_API_URL: where the API is
+npm start
+```
+
+Then press `i` for the iOS simulator (on a Mac), `a` for an Android emulator, or
+`w` for a browser. To use it on your own phone, install **Expo Go** from the App
+Store or Play Store and scan the QR code; the API has to be reachable from the
+phone, so see [Trying it on a phone](#trying-it-on-a-phone).
+
+1. Read what the app will do, tick the box, and tap **Continue with Google**.
+   Allow the read-only Gmail access on Google's screen.
+2. On **Accounts → Banks & wallets**, add the banks and wallets you use.
+3. Tap **Sync now** on **Home**. The first sync covers the last 365 days. The
+   **Get started** card on Home walks through these steps until they're done.
+
+### Trying it on a phone
+
+Google only sends sign-ins back to `localhost` or to a public HTTPS address,
+never to a computer's local network address. So:
+
+- **iOS simulator, or the browser:** `http://localhost:8000` works as is.
+- **Android emulator:** run `adb reverse tcp:8000 tcp:8000`, then
+  `http://localhost:8000` works there too.
+- **A real phone:** give the API a public HTTPS address, for example with a
+  tunnel (`cloudflared tunnel --url http://localhost:8000`, or ngrok) or by
+  deploying it. Set `API_PUBLIC_URL` to that address when starting the API, add
+  `<that address>/auth/google/callback` to the OAuth client's redirect URIs, and
+  put the address in `mobile/.env.local` as `EXPO_PUBLIC_API_URL`.
+
+### Publishing the app
+
+The app is built and signed in the cloud with [EAS](https://docs.expo.dev/eas/),
+so no Mac or Android Studio is needed (an Apple Developer account is, for iOS):
+
+```bash
+cd mobile
+npx eas-cli@latest login
+npx eas-cli@latest build --profile preview --platform android   # an APK to install directly
+npx eas-cli@latest build --profile production --platform all    # for the App Store and Play Store
+npx eas-cli@latest submit --platform ios
+```
+
+Set `EXPO_PUBLIC_API_URL` for each build to the deployed API (in
+`mobile/.env.production`, or as an EAS environment variable). Change the bundle
+identifier and package name (`com.expensetracker.app` in `mobile/app.json`)
+to your own first.
+
+To deploy the API, run `python -m api` behind HTTPS (any host that runs Python;
+a reverse proxy such as Caddy or nginx in front), as **one process**: syncs
+are tracked in its memory. Set `API_PUBLIC_URL`, `GMAIL_TOKEN_KEY`, the Google
+client, and:
+
+| Variable | What it's for | Default |
+|---|---|---|
+| `APP_RETURN_PREFIXES` | Where sign-in may send the browser back to: the app's scheme, Expo Go while developing, the web build. | `expensetracker://,exp://,exps://,http://localhost:8081/` |
+| `APP_WEB_ORIGINS` | Origins allowed to call the API from a browser (the web build). | `http://localhost:8081` |
+| `ORDER_TRACKER_DATA_DIR` | Where each user's data lives: persistent, backed-up storage. | `data/` |
+
+In production, drop `exp://,exps://` from `APP_RETURN_PREFIXES` once nobody uses
+Expo Go, and add the web build's address to both if you host it.
+
+### The website
+
+The Streamlit website still works on the same data:
 
 ```bash
 .venv/bin/streamlit run app.py
 ```
 
-Open http://localhost:8501:
-
-1. The first time only: on **Set up Google access**, paste the client ID and secret.
-2. Read what the app will do, tick the box, and click **Continue with Google**.
-   Google opens in a new tab and the app continues there. Allow the read-only
-   Gmail access on Google's screen.
-3. On **Accounts → Banks & wallets**, add the banks and wallets you use.
-4. Click **Sync now** on **Home**. The first sync covers the last 365 days.
-   The **Get started** box on Home walks through these steps until they're done.
+Open http://localhost:8501. The first time only, if the Google client isn't set
+in the environment, its **Set up Google access** page asks for the client ID and
+secret. Google opens in a new tab and the website continues there.
 
 ## Automatic background sync
 
-The app syncs by itself when a user opens it, if their last sync was more than
-6 hours ago. To keep everyone up to date even when the app is closed, run the
+The app (and the website) syncs by itself when a user opens it, if their last
+sync was more than 6 hours ago. To keep everyone up to date even when the app is closed, run the
 CLI on a schedule. It syncs every user who has granted Gmail access, each with
 their own permission and their own banks and wallets:
 
@@ -377,13 +501,30 @@ Other commands:
   `tests/test_parsers.py`.
 
 Install the test tools with `.venv/bin/pip install -r requirements-dev.txt`, and
-run the tests with `.venv/bin/python -m pytest`. Then use **Re-scan** in
+run the tests with `.venv/bin/python -m pytest` (the API's are in
+`tests/test_api.py`). For the app, run `npm run typecheck` and `npm run lint` in
+`mobile/`. Then use **Re-scan** in
 **Home → Sync options** so stored emails are read again. Your category changes are kept.
 
 ## Project layout
 
 ```
-app.py                       Shell: setup page, Continue with Google + callback, auto-sync, navigation
+mobile/                      The phone app (Expo, React Native, TypeScript); see mobile/README.md
+  src/app/                   Screens, by route: sign-in, the four tabs, and sheets (payment, payments behind
+                             a figure, add expense, sync options, a bank)
+  src/sections/              One component per sub-tab
+  src/components/            The app's look (cards, lists, fields), charts, icons, date picker
+  src/lib/                   The API client, sign-in (PKCE), syncing, theme, response types
+api/                         The API the app talks to (FastAPI); run with python -m api
+  auth_routes.py             Continue with Google for the app: start, callback, one-time code exchange
+  sync_jobs.py               Syncing in the background, with progress for the app to show
+  home.py                    Home: status, syncing, Overview, Trends, Places, Budget, payments behind a figure
+  payments.py                One payment (change it or remove it), adding an expense
+  activity.py                Transactions (and CSV), statements, transfers, delivery orders
+  accounts.py                Banks and wallets, statement settings, imports
+  settings.py                Account and Gmail, rules and lists, skipped emails, privacy (also /privacy)
+  common.py                  Signed-in user, their store, time zone, list rows
+app.py                       The website (Streamlit): setup page, Continue with Google + callback, navigation
 views/                       The four tabs (overview is Home, activity, accounts, settings), public privacy page
   common.py                  Signed-in user, store, formatting, the app's look (cards, colors, icons), charts
   components.py              Tappable list rows (st.components.v2), and redrawing on a theme switch
@@ -391,7 +532,8 @@ views/                       The four tabs (overview is Home, activity, accounts
   sections/                  One module per sub-tab, each with a render() function
 order_tracker/
   users.py                   Signed-in users and their separate data directories
-  sessions.py                Remembered sign-ins (30 days), stored as token hashes
+  sessions.py                Remembered sign-ins (30 days on the website, 180 in the app), stored as token hashes
+  consent.py                 What users are told before allowing Gmail, and the privacy notice
   auth.py                    Continue with Google (identity + Gmail permission), revoking, encrypted tokens
   config.py                  Google client (setup page, secrets or env), data dir, encryption key
   gmail_client.py            Gmail API: search and fetch messages
@@ -419,9 +561,10 @@ tests/                       pytest suite
 
 ## Limitations
 
-- Only money movements that reach your Gmail are found automatically. SMS-only alerts and in-app-only history are invisible to the app, so turn on email alerts where you can; monthly statements fill in the rest for banks that email them, and you can paste an SMS or notification under **Add expense**. Reading phone notifications by itself needs a phone app (Android only; iPhones don't let apps read other apps' notifications or SMS).
+- Only money movements that reach your Gmail are found automatically. SMS-only alerts and in-app-only history are invisible to the app, so turn on email alerts where you can; monthly statements fill in the rest for banks that email them, and you can paste an SMS or notification under **Add expense**. Reading bank SMS or notifications by itself would be a next step for the phone app, on Android only: iPhones don't let apps read other apps' notifications or SMS.
 - Statements must be text PDFs. Scanned (image-only) PDFs, and statements sent as ZIP files or links to a website, can't be read.
 - If a bank emails two alerts for one payment (say, a card alert and an account alert), both are counted. Narrow that bank's subject under **Accounts → Banks & wallets** to keep only one kind.
 - Totals are not converted between currencies. With several currencies (PKR and USD, say), pick one in the currency filter.
+- The API keeps track of running syncs in memory, so run it as one process.
 - Users are kept apart by directory on one server. Anyone with access to that server can read every user's data. The Gmail tokens are encrypted, but the extracted transactions are not.
 # ExpenseTracker

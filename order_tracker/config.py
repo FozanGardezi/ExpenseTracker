@@ -33,10 +33,14 @@ def data_dir() -> Path:
 
 
 def _secrets() -> dict:
-    """st.secrets inside the app (covers hosted platforms), the secrets file from the command line."""
-    from streamlit import runtime
+    """st.secrets inside the Streamlit app (covers hosted platforms), otherwise the secrets
+    file (the API server and the command line, which don't need Streamlit installed)."""
+    try:
+        from streamlit import runtime
+    except ImportError:
+        runtime = None
 
-    if runtime.exists():
+    if runtime is not None and runtime.exists():
         import streamlit as st
 
         try:

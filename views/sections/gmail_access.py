@@ -6,10 +6,11 @@ import streamlit as st
 
 from order_tracker import auth
 from order_tracker.config import load_google_config
+from order_tracker.consent import consent_markdown
 from order_tracker.storage import OrderStore
 from order_tracker.sync import available_sources
 from order_tracker.users import User, delete_user_data
-from views.common import consent_markdown, flash, gmail_session, gmail_tokens, sign_out, viewer_timezone
+from views.common import flash, gmail_session, gmail_tokens, sign_out, viewer_timezone
 
 
 def render(store: OrderStore, user: User) -> None:
